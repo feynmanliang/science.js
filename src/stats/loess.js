@@ -59,45 +59,53 @@ science.stats.loess = function() {
         var ileft = bandwidthInterval[0],
             iright = bandwidthInterval[1];
 
-        // Compute a least-squares linear fit weighted by
-        // the product of robustness weights and the tricube
-        // weight function.
-        // See http://en.wikipedia.org/wiki/Linear_regression
-        // (section "Univariate linear case")
-        // and http://en.wikipedia.org/wiki/Weighted_least_squares
-        // (section "Weighted least squares")
-        var sumWeights = 0,
-            sumX = 0,
-            sumXSquared = 0,
-            sumY = 0,
-            sumXY = 0,
-            denom = Math.abs(2 / (xval[iright] - x[ileft]));
+        // Compute the point of the bandwidth interval that is
+        // farthest from x
+        var edge = (xval[i] - xval[ileft]) > (xval[iright] - xval[i]) ? ileft : iright;
 
-        for (var k = ileft; k <= iright; ++k) {
-          var xk   = xval[k],
-              yk   = yval[k],
-              dist = k < i ? x - xk : xk - x,
-              w    = science_stats_loessTricube(dist * denom) * robustnessWeights[k] * weights[k],
-              xkw  = xk * w;
-          sumWeights += w;
-          sumX += xkw;
-          sumXSquared += xk * xkw;
-          sumY += yk * w;
-          sumXY += yk * xkw;
+        if (Math.abs(xval[edge] - x) === 0) { // avoid divide by zero
+          res[i] = yval[i];
+          residuals[i] = 0;
+        } else {
+          // Compute a least-squares linear fit weighted by
+          // the product of robustness weights and the tricube
+          // weight function.
+          // See http://en.wikipedia.org/wiki/Linear_regression
+          // (section "Univariate linear case")
+          // and http://en.wikipedia.org/wiki/Weighted_least_squares
+          // (section "Weighted least squares")
+          var sumWeights = 0,
+              sumX = 0,
+              sumXSquared = 0,
+              sumY = 0,
+              sumXY = 0,
+              denom = Math.abs(1 / (xval[edge] - x));
+
+          for (var k = ileft; k <= iright; ++k) {
+            var xk   = xval[k],
+                yk   = yval[k],
+                dist = k < i ? x - xk : xk - x,
+                w    = science_stats_loessTricube(dist * denom) * robustnessWeights[k] * weights[k],
+                xkw  = xk * w;
+            sumWeights += w;
+            sumX += xkw;
+            sumXSquared += xk * xkw;
+            sumY += yk * w;
+            sumXY += yk * xkw;
+          }
+
+          var meanX = sumX / sumWeights,
+              meanY = sumY / sumWeights,
+              meanXY = sumXY / sumWeights,
+              meanXSquared = sumXSquared / sumWeights;
+
+          var beta = (Math.sqrt(Math.abs(meanXSquared - meanX * meanX)) < accuracy)
+              ? 0 : ((meanXY - meanX * meanY) / (meanXSquared - meanX * meanX));
+
+          var alpha = meanY - beta * meanX;
+          res[i] = beta * x + alpha;
+          residuals[i] = Math.abs(yval[i] - res[i]);
         }
-
-        var meanX = sumX / sumWeights,
-            meanY = sumY / sumWeights,
-            meanXY = sumXY / sumWeights,
-            meanXSquared = sumXSquared / sumWeights;
-
-        var beta = (Math.sqrt(Math.abs(meanXSquared - meanX * meanX)) < accuracy)
-            ? 0 : ((meanXY - meanX * meanY) / (meanXSquared - meanX * meanX));
-
-        var alpha = meanY - beta * meanX;
-
-        res[i] = beta * x + alpha;
-        residuals[i] = Math.abs(yval[i] - res[i]);
       }
 
       // No need to recompute the robustness weights at the last
