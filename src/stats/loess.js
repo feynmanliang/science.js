@@ -59,10 +59,6 @@ science.stats.loess = function() {
         var ileft = bandwidthInterval[0],
             iright = bandwidthInterval[1];
 
-        // Compute the point of the bandwidth interval that is
-        // farthest from x
-        var edge = (xval[i] - xval[ileft]) > (xval[iright] - xval[i]) ? ileft : iright;
-
         // Compute a least-squares linear fit weighted by
         // the product of robustness weights and the tricube
         // weight function.
@@ -75,7 +71,7 @@ science.stats.loess = function() {
             sumXSquared = 0,
             sumY = 0,
             sumXY = 0,
-            denom = Math.abs(1 / (xval[edge] - x));
+            denom = Math.abs(2 / (xval[iright] - x[ileft]));
 
         for (var k = ileft; k <= iright; ++k) {
           var xk   = xval[k],
